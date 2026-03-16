@@ -38,14 +38,14 @@ function ColHeader({ label }: { label: string }) {
   const tip = COLUMN_TOOLTIPS[label]
   return (
     <span className="relative inline-flex items-center group/th cursor-pointer">
-      <span style={{ color: '#22d3ee', fontWeight: 600 }}>{label}</span>
+      <span style={{ color: 'var(--cyan)', fontWeight: 600 }}>{label}</span>
       {tip && (
-        <span className="t-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-56
+        <span className="t-tooltip pointer-events-none absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-56
           rounded-xl px-3 py-2 text-left text-xs font-normal normal-case whitespace-normal leading-relaxed
           border shadow-2xl opacity-0 group-hover/th:opacity-100 transition-opacity duration-150 z-[9999]">
           {tip}
-          <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0"
-            style={{ borderLeft:'4px solid transparent', borderRight:'4px solid transparent', borderTop:'4px solid var(--border)' }} />
+          <span className="absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0"
+            style={{ borderLeft:'4px solid transparent', borderRight:'4px solid transparent', borderBottom:'4px solid var(--border)' }} />
         </span>
       )}
     </span>
@@ -252,18 +252,18 @@ export default function App() {
           <div className="h-full overflow-y-auto overflow-x-hidden t-card">
             <table className="w-full text-sm text-left table-fixed">
               <colgroup>
-                {[140,64,80,110,90,110,110,72,110,100,64,80,90].map((w,i) => <col key={i} style={{ width: `${w}px` }} />)}
+                {['14%','6%','7%','10%','8%','10%','10%','6%','9%','8%','6%','7%','9%'].map((w,i) => <col key={i} style={{ width: w }} />)}
               </colgroup>
-              <thead className="sticky top-0 z-[100] t-head">
+              <thead className="sticky top-0 t-head" style={{ zIndex: 100 }}>
                 {table.getHeaderGroups().map(hg => (
                   <tr key={hg.id} className="t-border-b">
                     {hg.headers.map(h => (
                       <th key={h.id} onClick={h.column.getToggleSortingHandler()}
-                        className="px-3 py-2.5 cursor-pointer select-none text-xs uppercase"
+                        className="px-3 py-2.5 cursor-pointer select-none text-xs uppercase text-left"
                         style={{ ':hover': { backgroundColor: 'var(--bg-hover)' } } as any}>
                         <span className="flex items-center gap-0.5">
                           {flexRender(h.column.columnDef.header, h.getContext())}
-                          <span style={{ color: '#0891b2', fontSize: '10px' }}>
+                          <span style={{ color: 'var(--cyan)', fontSize: '10px' }}>
                             {h.column.getIsSorted() === 'asc' ? '↑' : h.column.getIsSorted() === 'desc' ? '↓' : ''}
                           </span>
                         </span>
@@ -276,7 +276,7 @@ export default function App() {
                 {table.getRowModel().rows.map((row, i) => (
                   <tr key={row.id} className={`t-hover t-border-b ${i < 3 ? 't-row-top' : 't-row'}`}>
                     {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} className="px-3 py-2 overflow-hidden text-ellipsis">
+                      <td key={cell.id} className="px-3 py-2 text-left overflow-hidden text-ellipsis">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -295,11 +295,11 @@ export default function App() {
         <p className="t-sub text-xs">
           ⚠️ Ceci n'est pas un conseil financier.{' '}
           <span className="relative inline-block group">
-            <span className="cursor-help underline decoration-dotted" style={{ color: '#22d3ee' }}>DYOR</span>
+            <span className="cursor-help underline decoration-dotted" style={{ color: 'var(--cyan)' }}>DYOR</span>
             <span className="t-tooltip pointer-events-none absolute bottom-[calc(100%+8px)] left-0 w-64
               rounded-xl px-3 py-2.5 text-left text-xs whitespace-normal leading-relaxed border shadow-2xl
               opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[9999]">
-              <span className="block font-semibold mb-1" style={{ color: '#22d3ee' }}>"DYOR" — Do Your Own Research</span>
+              <span className="block font-semibold mb-1" style={{ color: 'var(--cyan)' }}>"DYOR" — Do Your Own Research</span>
               Fais tes propres recherches. Les données sont informatives, pas des conseils d'investissement.
             </span>
           </span>.

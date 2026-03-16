@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  --cyan:      #0891b2;
   --bg:        #f8fafc;
   --bg-card:   #ffffff;
   --bg-head:   #f1f5f9;
@@ -20,6 +21,7 @@
 }
 
 html.dark {
+  --cyan:      #22d3ee;
   --bg:        #0f172a;
   --bg-card:   #1e293b;
   --bg-head:   #0f172a;
