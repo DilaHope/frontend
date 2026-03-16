@@ -63,6 +63,7 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   )
 }
 
+// Colonnes desktop complètes
 const columns = [
   col.accessor('name', {
     header: () => <ColHeader label="Coin" />,
@@ -103,7 +104,7 @@ const columns = [
   }),
   col.accessor('price', {
     header: () => <ColHeader label="Prix" />,
-    cell: info => <span className="text-xs t-text">{info.getValue() != null ? `$${Number(info.getValue()).toFixed(6)}` : '—'}</span>,
+    cell: info => <span className="text-xs t-text">{info.getValue() != null ? `${Number(info.getValue()).toFixed(6)}` : '—'}</span>,
   }),
   col.accessor('volume_24h', {
     header: () => <ColHeader label="Volume 24h" />,
@@ -144,6 +145,60 @@ const columns = [
   }),
 ]
 
+// Colonnes tablette (6 colonnes essentielles)
+const tabletColumns = [
+  columns[0], // Coin
+  columns[1], // Score
+  columns[2], // Narrative
+  columns[3], // Market Cap
+  columns[5], // Volume 24h
+  columns[10], // Manip.
+]
+
+// Vue carte pour mobile
+function CoinCard({ coin, rank }: { coin: Crypto; rank: number }) {
+  const n = coin.dominant_narrative
+  const scoreColor = coin.score >= 50 ? '#4ade80' : coin.score >= 25 ? '#facc15' : '#f87171'
+  const manipColor = coin.manipulation_score != null
+    ? (coin.manipulation_score > 0.5 ? '#f87171' : coin.manipulation_score > 0.2 ? '#facc15' : '#4ade80')
+    : null
+  return (
+    <div className="t-card rounded-xl border t-border p-3 flex flex-col gap-2" style={{ borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs t-sub w-5 text-right shrink-0">#{rank}</span>
+          {coin.image && <img src={coin.image} alt="" width={28} height={28} className="rounded-full shrink-0" />}
+          <div>
+            <div className="font-semibold text-sm t-text">{coin.name}</div>
+            <div className="text-[10px] t-sub uppercase">{coin.symbol}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {n && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
+              style={{ backgroundColor: NARRATIVE_BG[n] || '#1e293b', color: NARRATIVE_TEXT[n] || '#cbd5e1' }}>
+              {n}
+            </span>
+          )}
+          <span style={{ color: scoreColor, fontWeight: 700, fontSize: '1rem' }}>{coin.score.toFixed(1)}</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <div className="flex justify-between"><span className="t-sub">Market Cap</span><span className="t-text">${coin.market_cap.toLocaleString()}</span></div>
+        <div className="flex justify-between"><span className="t-sub">Prix</span><span className="t-text">{coin.price != null ? `$${Number(coin.price).toFixed(6)}` : '—'}</span></div>
+        <div className="flex justify-between"><span className="t-sub">Volume 24h</span><span className="t-text">${coin.volume_24h.toLocaleString()}</span></div>
+        <div className="flex justify-between"><span className="t-sub">Liquidité</span><span className="t-text">{coin.liquidity ? `$${Number(coin.liquidity).toLocaleString()}` : '—'}</span></div>
+        <div className="flex justify-between"><span className="t-sub">Manip.</span>
+          <span style={{ color: manipColor || 'var(--text-muted)' }} className="font-semibold">
+            {coin.manipulation_score != null ? `${(coin.manipulation_score * 100).toFixed(0)}%` : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between"><span className="t-sub">Âge paire</span><span className="t-text">{!coin.pair_age_days || coin.pair_age_days === 999 ? '—' : `${coin.pair_age_days}j`}</span></div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [dark, setDark] = useState(() => (localStorage.getItem('theme') || 'dark') === 'dark')
   const [data, setData]               = useState<Crypto[]>([])
@@ -157,7 +212,17 @@ export default function App() {
   const PAGE_SIZE = 14
   const prevCountRef = useRef(0)
 
-  
+  // Détection breakpoint
+  const [isMobile, setIsMobile]   = useState(() => window.innerWidth < 768)
+  const [isTablet, setIsTablet]   = useState(() => window.innerWidth >= 768 && window.innerWidth < 1024)
+  useEffect(() => {
+    const onResize = () => {
+      setIsMobile(window.innerWidth < 768)
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const load = async () => {
     try { const res = await fetchRanking(100); setData(res.top); setLastUpdate(res.last_update); setError('') }
@@ -177,7 +242,8 @@ export default function App() {
     load()
     const hId = setInterval(checkHealth, 5_000)
     const dId = setInterval(load, 30_000)
-    return () => { clearInterval(hId); clearInterval(dId) }
+    const kaId = setInterval(() => fetchHealth().catch(() => {}), 10 * 60 * 1000)
+    return () => { clearInterval(hId); clearInterval(dId); clearInterval(kaId) }
   }, [])
 
   const filtered = useMemo(() =>
@@ -188,18 +254,32 @@ export default function App() {
   const paginated  = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page])
   useEffect(() => { setPage(1) }, [search])
 
+  const activeColumns = isTablet ? tabletColumns : columns
   const table = useReactTable({
-    data: paginated, columns,
+    data: paginated, columns: activeColumns,
     state: { sorting }, onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(),
   })
 
+  const toggleTheme = () => {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    document.documentElement.style.backgroundColor = next ? '#0f172a' : '#f8fafc'
+    localStorage.setItem('theme', next ? 'dark' : 'light')
+  }
+
   return (
-    <div className="t-bg h-screen flex flex-col overflow-hidden px-4 py-3 w-full max-w-[1600px] mx-auto">
+    <div className="t-bg min-h-screen flex flex-col px-3 py-3 md:px-4 w-full max-w-[1600px] mx-auto"
+      style={{ height: isMobile ? 'auto' : '100vh', overflow: isMobile ? 'auto' : 'hidden' }}>
 
       {/* Header */}
-      <div className="mb-2 shrink-0">
-        <h1 className="text-4xl font-bold leading-tight" style={{ color: '#3b82f6' }}>Crypto Gem Ranking</h1>
+      <div className="mb-2 shrink-0 flex items-center justify-between">
+        <h1 className="text-2xl md:text-4xl font-bold leading-tight" style={{ color: '#3b82f6' }}>Crypto Gem Ranking</h1>
+        <button onClick={toggleTheme}
+          className="t-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-80 md:hidden">
+          {dark ? '☀️' : '🌙'}
+        </button>
       </div>
 
       {error && (
@@ -209,19 +289,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Recherche + info + boutons */}
-      <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+      {/* Barre de contrôles */}
+      <div className="flex items-center justify-between gap-2 mb-2 shrink-0 flex-wrap">
         <div className="flex gap-2 items-center">
-          <input type="text" placeholder="Rechercher un coin..." value={search}
+          <input type="text" placeholder="Rechercher..." value={search}
             onChange={e => setSearch(e.target.value)}
             className="t-input px-3 py-1.5 rounded-lg text-sm border focus:outline-none"
-            style={{ width: '15vw', minWidth: '120px', backgroundColor: 'var(--input-bg)', borderColor: 'var(--border)', color: 'var(--text)' }} />
-          <button onClick={load} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
-            Rafraîchir
+            style={{ width: isMobile ? '40vw' : '15vw', minWidth: '100px', backgroundColor: 'var(--input-bg)', borderColor: 'var(--border)', color: 'var(--text)' }} />
+          <button onClick={load} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+            {isMobile ? '↻' : 'Rafraîchir'}
           </button>
         </div>
 
-        <p className="text-xs t-muted text-center">
+        <p className="text-xs t-muted text-center hidden md:block">
           Small caps — mise à jour : <span className="t-text">{lastUpdate || '—'}</span>
           <span className="ml-3 inline-flex items-center gap-1">
             <span className={`w-1.5 h-1.5 rounded-full ${isUpdating ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -229,69 +309,91 @@ export default function App() {
           </span>
         </p>
 
-        <button onClick={() => {
-            const next = !dark
-            setDark(next)
-            document.documentElement.classList.toggle('dark', next)
-            document.documentElement.style.backgroundColor = next ? '#0f172a' : '#f8fafc'
-            localStorage.setItem('theme', next ? 'dark' : 'light')
-          }}
-          className="t-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-80">
+        <button onClick={toggleTheme}
+          className="t-btn px-3 py-1.5 rounded-lg border text-xs font-medium transition hover:opacity-80 hidden md:block">
           {dark ? '☀️ Light' : '🌙 Dark'}
         </button>
       </div>
 
-      {/* Tableau */}
-      <div className="flex-1 min-h-0 rounded-xl border shadow-lg overflow-hidden t-border"
-        style={{ borderColor: 'var(--border)' }}>
-        {data.length === 0 ? (
-          <div className="flex items-center justify-center h-full t-muted">
-            {error ? 'Aucune donnée disponible.' : 'Chargement des gems...'}
-          </div>
-        ) : (
-          <div className="h-full overflow-y-auto overflow-x-hidden t-card">
-            <table className="w-full text-sm text-left table-fixed">
-              <colgroup>
-                {['14%','6%','7%','10%','8%','10%','10%','6%','9%','8%','6%','7%','9%'].map((w,i) => <col key={i} style={{ width: w }} />)}
-              </colgroup>
-              <thead className="sticky top-0 t-head" style={{ zIndex: 100 }}>
-                {table.getHeaderGroups().map(hg => (
-                  <tr key={hg.id} className="t-border-b">
-                    {hg.headers.map(h => (
-                      <th key={h.id} onClick={h.column.getToggleSortingHandler()}
-                        className="px-3 py-2.5 cursor-pointer select-none text-xs uppercase text-left"
-                        style={{ ':hover': { backgroundColor: 'var(--bg-hover)' } } as any}>
-                        <span className="flex items-center gap-0.5">
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                          <span style={{ color: 'var(--cyan)', fontSize: '10px' }}>
-                            {h.column.getIsSorted() === 'asc' ? '↑' : h.column.getIsSorted() === 'desc' ? '↓' : ''}
+      {/* Status mobile */}
+      {isMobile && (
+        <p className="text-xs t-muted mb-2 shrink-0">
+          Màj : <span className="t-text">{lastUpdate || '—'}</span>
+          <span className="ml-2 inline-flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full ${isUpdating ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            <span>{isUpdating ? `Scoring — ${cachedCount}` : `${cachedCount} coins`}</span>
+          </span>
+        </p>
+      )}
+
+      {/* Vue mobile : cards */}
+      {isMobile ? (
+        <div className="flex flex-col gap-2 pb-4">
+          {data.length === 0 ? (
+            <div className="flex items-center justify-center py-12 t-muted">
+              {error ? 'Aucune donnée disponible.' : 'Chargement des gems...'}
+            </div>
+          ) : (
+            paginated.map((coin, i) => (
+              <CoinCard key={coin.id} coin={coin} rank={(page - 1) * PAGE_SIZE + i + 1} />
+            ))
+          )}
+        </div>
+      ) : (
+        /* Vue tablette/desktop : tableau */
+        <div className="flex-1 min-h-0 rounded-xl border shadow-lg overflow-hidden t-border"
+          style={{ borderColor: 'var(--border)' }}>
+          {data.length === 0 ? (
+            <div className="flex items-center justify-center h-full t-muted">
+              {error ? 'Aucune donnée disponible.' : 'Chargement des gems...'}
+            </div>
+          ) : (
+            <div className="h-full overflow-y-auto overflow-x-hidden t-card">
+              <table className="w-full text-sm text-left table-fixed">
+                <colgroup>
+                  {isTablet
+                    ? ['22%','10%','12%','18%','18%','12%'].map((w,i) => <col key={i} style={{ width: w }} />)
+                    : ['14%','6%','7%','10%','8%','10%','10%','6%','9%','8%','6%','7%','9%'].map((w,i) => <col key={i} style={{ width: w }} />)
+                  }
+                </colgroup>
+                <thead className="sticky top-0 t-head" style={{ zIndex: 100 }}>
+                  {table.getHeaderGroups().map(hg => (
+                    <tr key={hg.id} className="t-border-b">
+                      {hg.headers.map(h => (
+                        <th key={h.id} onClick={h.column.getToggleSortingHandler()}
+                          className="px-3 py-2.5 cursor-pointer select-none text-xs uppercase text-left">
+                          <span className="flex items-center gap-0.5">
+                            {flexRender(h.column.columnDef.header, h.getContext())}
+                            <span style={{ color: 'var(--cyan)', fontSize: '10px' }}>
+                              {h.column.getIsSorted() === 'asc' ? '↑' : h.column.getIsSorted() === 'desc' ? '↓' : ''}
+                            </span>
                           </span>
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row, i) => (
-                  <tr key={row.id} className={`t-hover t-border-b ${i < 3 ? 't-row-top' : 't-row'}`}>
-                    {row.getVisibleCells().map(cell => (
-                      <td key={cell.id} className="px-3 py-2 text-left overflow-hidden text-ellipsis">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row, i) => (
+                    <tr key={row.id} className={`t-hover t-border-b ${i < 3 ? 't-row-top' : 't-row'}`}>
+                      {row.getVisibleCells().map(cell => (
+                        <td key={cell.id} className="px-3 py-2 text-left overflow-hidden text-ellipsis">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 && search && <p className="text-center py-2 t-muted text-xs shrink-0">Aucun résultat.</p>}
 
-      {/* Footer */}
-      <div className="shrink-0 flex items-center justify-between mt-2">
+      {/* Footer + pagination */}
+      <div className="shrink-0 flex items-center justify-between mt-2 flex-wrap gap-2">
         <p className="t-sub text-xs">
           ⚠️ Ceci n'est pas un conseil financier.{' '}
           <span className="relative inline-block group">
@@ -307,14 +409,10 @@ export default function App() {
 
         {totalPages > 1 && (
           <div className="flex items-center gap-1">
-            {(['«', () => setPage(1)] as const)[0] && (
-              <>
-                <button onClick={() => setPage(1)} disabled={page === 1}
-                  className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">«</button>
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">‹</button>
-              </>
-            )}
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">‹</button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
@@ -331,10 +429,10 @@ export default function App() {
                   </button>
               )}
 
-                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">›</button>
-                <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-                  className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">»</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="px-2 py-1 rounded text-xs t-muted hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition">»</button>
 
             <span className="ml-2 text-xs t-sub tabular-nums">
               {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
