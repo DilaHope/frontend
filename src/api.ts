@@ -9,7 +9,7 @@ export async function fetchRanking(limit = 100): Promise<RankingResponse> {
   return data
 }
 
-export async function fetchHealth(): Promise<{ status: string; cached_coins: number; last_update: string }> {
+export async function fetchHealth(): Promise<{ status: string; cached_coins: number; last_update: string; is_updating: boolean }> {
   const { data } = await axios.get(`${BASE}/health`)
   return data
 }
