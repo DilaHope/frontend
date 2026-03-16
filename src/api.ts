@@ -2,9 +2,10 @@ import axios from 'axios'
 import type { RankingResponse } from './types'
 
 // En dev : proxy Vite vers localhost:8000
-// En prod : VITE_API_URL = https://ton-backend.onrender.com
-const BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}`
+// En prod : window.__API_URL__ injecté via index.html ou fallback /api
+declare const __API_URL__: string | undefined
+const BASE = (typeof __API_URL__ !== 'undefined' && __API_URL__)
+  ? __API_URL__
   : '/api'
 
 export async function fetchRanking(limit = 100): Promise<RankingResponse> {
